@@ -1,4 +1,4 @@
-# marketing_streaming_pipeline
+# marketing_streaming_pipeline/NASA Project
 final_project_cdac
 folder structure:
 ingestion/
