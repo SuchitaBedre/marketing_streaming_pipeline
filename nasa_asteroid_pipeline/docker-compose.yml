@@ -1,0 +1,66 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:6
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - S3_BUCKET_NAME=file:///opt/airflow/data
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+    ports:
+      - 8080:8080
+    command: webserver
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0
+    depends_on:
+      - airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - S3_BUCKET_NAME=file:///opt/airflow/data
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+    command: scheduler
+
+  spark-master:
+    image: bitnami/spark:3.4.1
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - 7077:7077
+
+  spark-worker:
+    image: bitnami/spark:3.4.1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+
+# Notes:
+# - This compose is an illustrative local setup: Postgres + Redis for Airflow, webserver and scheduler
+# - You still need a Spark distribution that can accept `spark-submit` inside the Airflow container, or
+#   you can configure the DAG to run spark-submit on a host that has Spark installed and can access mounted data.
